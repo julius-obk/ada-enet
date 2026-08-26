@@ -319,7 +319,8 @@ package body Net.Protos.Arp is
         or Req.Arp.Ea_Hdr.Ar_Hdr /= Net.Headers.To_Network (ARPOP_REQUEST)
         or Req.Arp.Ea_Hdr.Ar_Pro /= Net.Headers.To_Network (ETHERTYPE_IP)
       then
-         Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+        Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+        Packet.Release;
          return;
       end if;
 
@@ -342,9 +343,10 @@ package body Net.Protos.Arp is
             if Req.Arp.Arp_Tpa = Ifnet.Ip and Req.Arp.Arp_Tha = Ifnet.Mac then
                Update (Ifnet, Req.Arp.Arp_Spa, Req.Arp.Arp_Sha);
             end if;
-
+              Packet.Release;
          when others =>
-            Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+           Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+             Packet.Release;
 
       end case;
    end Receive;

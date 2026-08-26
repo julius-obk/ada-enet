@@ -1,4 +1,4 @@
------------------------------------------------------------------------
+  -----------------------------------------------------------------------
 --  net-buffers -- Network buffers
 --  Copyright (C) 2016, 2017, 2018 Stephane Carrez
 --  Written by Stephane Carrez (Stephane.Carrez@gmail.com)
@@ -107,9 +107,15 @@ package Net.Buffers is
    type Packet_Type is (RAW_PACKET, ETHER_PACKET, ARP_PACKET, IP_PACKET, UDP_PACKET, ICMP_PACKET,
                         DHCP_PACKET);
 
-   type Data_Type is array (Net.Uint16 range 0 .. 1500 + 31) of aliased Uint8 with
+--   type Data_Type is array (Net.Uint16 range 0 .. 1500 + 31) of aliased Uint8 with -- 0 .. 2048) of aliased Uint8 with 
+  --   Alignment => 32;
+
+     type Data_Type is array (Net.Uint16 range 0 .. 2047) of aliased Uint8 with -- 0 .. 2048) of aliased Uint8 with 
      Alignment => 32;
 
+
+
+     
    type Buffer_Type is tagged limited private;
 
    --  Returns true if the buffer is null (allocation failed).
@@ -299,6 +305,8 @@ private
       Size   : Uint16 := 0;
       Pos    : Uint16 := 0;
       Packet : Packet_Buffer_Access;
+      -- 
+      --big : Boolean := False;
    end record;
 
    type Buffer_List is limited record
@@ -309,4 +317,6 @@ private
    NET_ALLOC_SIZE : constant Uint32 := 4 + (Packet_Buffer'Size / 8);
    NET_BUF_SIZE   : constant Uint32 := Data_Type'Size / 8;
 
+   alloc_counter : Natural := 0;
+   all_buffers : Natural := 0;
 end Net.Buffers;

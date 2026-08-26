@@ -107,6 +107,7 @@ package body Net.Sockets.Udp is
          Soc := Soc.Next;
       end loop;
       Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+      Packet.Release; --neu
    end Input;
 
    --  ------------------------------

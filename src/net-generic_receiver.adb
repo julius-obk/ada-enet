@@ -17,7 +17,7 @@
 -----------------------------------------------------------------------
 with Ada.Real_Time;
 with Ada.Synchronous_Task_Control;
-with Net.Buffers;
+with Net.Buffers; use Net.Buffers;
 with Net.Protos.Arp;
 with Net.Protos.Dispatchers;
 with Net.Headers;
@@ -52,6 +52,8 @@ package body Net.Generic_Receiver is
       Dt      : Us_Time;
       Total   : Net.Uint64 := 0;
       Count   : Net.Uint64 := 0;
+      --
+      pkg_len : Uint16;
    begin
       --  Wait until the Ethernet driver is ready.
       Ada.Synchronous_Task_Control.Suspend_Until_True (Ready);
@@ -67,6 +69,7 @@ package body Net.Generic_Receiver is
             Ifnet.Receive (Packet);
             Now := Ada.Real_Time.Clock;
             Ether := Packet.Ethernet;
+            
             if Ether.Ether_Type = ETHERTYPE_ARP then
                Net.Protos.Arp.Receive (Ifnet, Packet);
             elsif Ether.Ether_Type = ETHERTYPE_IP then
@@ -89,6 +92,7 @@ package body Net.Generic_Receiver is
          else
             delay until Ada.Real_Time.Clock + Ada.Real_Time.Milliseconds (100);
          end if;
+         delay 0.001;
       end loop;
    end Controller;
 

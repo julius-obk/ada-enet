@@ -19,6 +19,9 @@ with Net.Headers;
 with Net.Protos.IPv4;
 with Net.Protos.Icmp;
 with Net.Sockets.Udp;
+with Ada.Text_IO;
+with Net.Buffers; use Net.Buffers;
+
 package body Net.Protos.Dispatchers is
 
    procedure Default_Receive (Ifnet  : in out Net.Interfaces.Ifnet_Type'Class;
@@ -60,7 +63,7 @@ package body Net.Protos.Dispatchers is
    procedure Default_Receive (Ifnet  : in out Net.Interfaces.Ifnet_Type'Class;
                               Packet : in out Net.Buffers.Buffer_Type) is
    begin
-      null;
+      Packet.Release; --neu  
    end Default_Receive;
 
    --  ------------------------------
@@ -68,8 +71,14 @@ package body Net.Protos.Dispatchers is
    --  ------------------------------
    procedure Receive (Ifnet  : in out Net.Interfaces.Ifnet_Type'Class;
                       Packet : in out Net.Buffers.Buffer_Type) is
-      Ip_Hdr : constant Net.Headers.IP_Header_Access := Packet.IP;
+         Ip_Hdr : constant Net.Headers.IP_Header_Access := Packet.IP;
+         Pkg_len : constant Uint16 := Packet.Get_Length;
+         Data_len : constant Uint16 := Packet.Get_Data_Size (Kind => IP_PACKET);
    begin
+         if Pkg_Len > 1600 then
+               Ada.Text_IO.Put_Line("Packet length is: " & Pkg_len'Img);
+               Ada.Text_IO.Put_Line("data length is: " & Data_len'Img);
+         end if;
       case Ip_Hdr.Ip_P is
          when Net.Protos.IPv4.P_ICMP =>
             Icmp_Receive (Ifnet, Packet);
