@@ -66,7 +66,7 @@ package body Net.Sockets.Udp is
    is
       Ip  : constant Net.Headers.IP_Header_Access := Packet.IP;
       Hdr : constant Net.Headers.UDP_Header_Access := Packet.UDP;
-      Len : constant Net.Uint16 := Packet.Get_Data_Size (Net.Buffers.IP_PACKET);
+      Len : constant Net.Uint16 := Packet.Get_Data_Size (Packet);
    begin
       Packet.Set_Length (Len + 20 + 14);
       Hdr.Uh_Dport := To.Port;
@@ -107,6 +107,7 @@ package body Net.Sockets.Udp is
          Soc := Soc.Next;
       end loop;
       Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+      Packet.Release; -- release packet as it has been ignored
    end Input;
 
    --  ------------------------------

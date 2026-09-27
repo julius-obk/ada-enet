@@ -15,6 +15,8 @@
 --  See the License for the specific language governing permissions and
 --  limitations under the License.
 -----------------------------------------------------------------------
+with Ada.Unchecked_Conversion;
+
 package Net.Headers is
 
    pragma Preelaborate;
@@ -36,19 +38,19 @@ package Net.Headers is
    type Ether_Header_Access is access all Ether_Header;
 
    type Arp_Header is record
-      Ar_Hdr      : Uint16;
-      Ar_Pro      : Uint16;
-      Ar_Hln      : Uint8;
-      Ar_Pln      : Uint8;
-      Ar_Op       : Uint16;
+      Ar_Hdr : Uint16;
+      Ar_Pro : Uint16;
+      Ar_Hln : Uint8;
+      Ar_Pln : Uint8;
+      Ar_Op  : Uint16;
    end record;
 
    type Ether_Arp is record
-      Ea_Hdr      : Arp_Header;
-      Arp_Sha     : Ether_Addr;
-      Arp_Spa     : Ip_Addr;
-      Arp_Tha     : Ether_Addr;
-      Arp_Tpa     : Ip_Addr;
+      Ea_Hdr  : Arp_Header;
+      Arp_Sha : Ether_Addr;
+      Arp_Spa : Ip_Addr;
+      Arp_Tha : Ether_Addr;
+      Arp_Tpa : Ip_Addr;
    end record;
    type Ether_Arp_Access is access all Ether_Arp;
 
@@ -61,34 +63,38 @@ package Net.Headers is
 
    --  IP packet header RFC 791.
    type IP_Header is record
-      Ip_Ihl      : Uint8;
-      Ip_Tos      : Uint8;
-      Ip_Len      : Uint16;
-      Ip_Id       : Uint16;
-      Ip_Off      : Uint16;
-      Ip_Ttl      : Uint8;
-      Ip_P        : Uint8;
-      Ip_Sum      : Uint16;
-      Ip_Src      : Ip_Addr;
-      Ip_Dst      : Ip_Addr;
+      Ip_Ihl : Uint8;
+      Ip_Tos : Uint8;
+      Ip_Len : Uint16;
+      Ip_Id  : Uint16;
+      Ip_Off : Uint16;
+      Ip_Ttl : Uint8;
+      Ip_P   : Uint8;
+      Ip_Sum : Uint16;
+      Ip_Src : Ip_Addr;
+      Ip_Dst : Ip_Addr;
    end record;
    type IP_Header_Access is access all IP_Header;
 
+   --ip header length in bytes
+   function Length (This : IP_Header) return Uint16
+   is (Uint16 (Shift_Right (This.Ip_Ihl, 4) * 4));
+
    --  UDP packet header RFC 768.
    type UDP_Header is record
-      Uh_Sport    : Uint16;
-      Uh_Dport    : Uint16;
-      Uh_Ulen     : Uint16;
-      Uh_Sum      : Uint16;
+      Uh_Sport : Uint16;
+      Uh_Dport : Uint16;
+      Uh_Ulen  : Uint16;
+      Uh_Sum   : Uint16;
    end record;
    type UDP_Header_Access is access all UDP_Header;
 
    --  IGMP v2 packet header RFC 2236.
    type IGMP_Header is record
-      Igmp_Type   : Uint8;
-      Igmp_Code   : Uint8;
-      Igmp_Cksum  : Uint16;
-      Igmp_Group  : Ip_Addr;
+      Igmp_Type  : Uint8;
+      Igmp_Code  : Uint8;
+      Igmp_Cksum : Uint16;
+      Igmp_Group : Ip_Addr;
    end record;
    type IGMP_Header_Access is access all IGMP_Header;
 
@@ -101,21 +107,47 @@ package Net.Headers is
    IGMP_PIM                  : constant Uint8 := 16#14#;
 
    type TCP_Header is record
-      Th_Sport    : Uint16;
-      Th_Dport    : Uint16;
-      Th_Seq      : Uint32;
-      Th_Ack      : Uint32;
-      Th_Off      : Uint8;
-      Th_Flags    : Uint8;
-      Th_Win      : Uint16;
-      Th_Sum      : Uint16;
-      Th_Urp      : Uint16;
+      Th_Sport : Uint16;
+      Th_Dport : Uint16;
+      Th_Seq   : Uint32;
+      Th_Ack   : Uint32;
+      Th_Off   : Uint8;
+      Th_Flags : Uint8;
+      Th_Win   : Uint16;
+      Th_Sum   : Uint16;
+      Th_Urp   : Uint16;
    end record;
    type TCP_Header_Access is access all TCP_Header;
 
-   ICMP_ECHO_REPLY           : constant Uint8 := 0;
-   ICMP_UNREACHABLE          : constant Uint8 := 3;
-   ICMP_ECHO_REQUEST         : constant Uint8 := 8;
+   -- tcp header length in bytes
+   function Length (This : TCP_Header) return Uint16
+   is (Uint16 (This.Th_Off and 2#0000_1111#) * 4);
+
+   type TCP_Control_Flags_Type is record
+      CWR : Boolean := False;
+      ECE : Boolean := False;
+      URG : Boolean := False;
+      ACK : Boolean := False;
+      PSH : Boolean := False;
+      RST : Boolean := False;
+      SYN : Boolean := False;
+      FIN : Boolean := False;
+   end record
+   with Pack, Object_Size => 8;
+
+   function To_Flags is new
+     Ada.Unchecked_Conversion (Uint8, TCP_Control_Flags_Type);
+   function To_Uint8 is new
+     Ada.Unchecked_Conversion (TCP_Control_Flags_Type, Uint8);
+
+   function Get_Flags (This : TCP_Header_Access) return TCP_Control_Flags_Type
+   is (To_Flags (This.all.Th_Flags));
+   procedure Set_Flags
+     (This : TCP_Header_Access; Flags : TCP_Control_Flags_Type);
+
+   ICMP_ECHO_REPLY   : constant Uint8 := 0;
+   ICMP_UNREACHABLE  : constant Uint8 := 3;
+   ICMP_ECHO_REQUEST : constant Uint8 := 8;
 
    type ICMP_Header is record
       Icmp_Type     : Uint8;
@@ -146,22 +178,23 @@ package Net.Headers is
    end record;
    type DHCP_Header_Access is access all DHCP_Header;
 
-   for DHCP_Header use record
-      Op     at 0 range 0 .. 7;
-      Htype  at 1 range 0 .. 7;
-      Hlen   at 2 range 0 .. 7;
-      Hops   at 3 range 0 .. 7;
-      Xid1   at 4 range 0 .. 15;
-      Xid2   at 6 range 0 .. 15;
-      Secs   at 8 range 0 .. 15;
-      Flags  at 10 range 0 .. 15;
-      Ciaddr at 12 range 0 .. 31;
-      Yiaddr at 16 range 0 .. 31;
-      Siaddr at 20 range 0 .. 31;
-      Giaddr at 24 range 0 .. 31;
-      Chaddr at 28 range 0 .. 127;
-      Sname  at 44 range 0 .. 511;
-      File   at 108 range 0 .. 1023;
-   end record;
+   for DHCP_Header use
+     record
+       Op     at 0   range 0 .. 7;
+       Htype  at 1   range 0 .. 7;
+       Hlen   at 2   range 0 .. 7;
+       Hops   at 3   range 0 .. 7;
+       Xid1   at 4   range 0 .. 15;
+       Xid2   at 6   range 0 .. 15;
+       Secs   at 8   range 0 .. 15;
+       Flags  at 10  range 0 .. 15;
+       Ciaddr at 12  range 0 .. 31;
+       Yiaddr at 16  range 0 .. 31;
+       Siaddr at 20  range 0 .. 31;
+       Giaddr at 24  range 0 .. 31;
+       Chaddr at 28  range 0 .. 127;
+       Sname  at 44  range 0 .. 511;
+       File   at 108 range 0 .. 1023;
+     end record;
 
 end Net.Headers;

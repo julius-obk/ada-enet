@@ -16,15 +16,19 @@
 --  limitations under the License.
 -----------------------------------------------------------------------
 with Ada.Unchecked_Conversion;
+with Net.Buffers;
+
 package body Net.Buffers is
 
-   ETHER_POS  : constant Uint16 := 0;
-   IP_POS     : constant Uint16 := ETHER_POS + 14;
-   UDP_POS    : constant Uint16 := IP_POS + 20;  --  Note: this is wrong due to IP options.
-   --  TCP_POS    : constant Uint16 := IP_POS + 24;  --  Note: this is wrong due to IP options.
-   IGMP_POS   : constant Uint16 := IP_POS + 24;
-   ICMP_POS   : constant Uint16 := IP_POS + 20;
-   DHCP_POS   : constant Uint16 := IP_POS + 20 + 8;
+   ETHER_POS : constant Uint16 := 0;
+   IP_POS    : constant Uint16 := ETHER_POS + 14;
+   UDP_POS   : constant Uint16 :=
+     IP_POS + 20;  --  Note: this is wrong due to IP options.
+   TCP_POS   : constant Uint16 :=
+     IP_POS + 20;  --  Note: this is wrong due to IP options.
+   IGMP_POS  : constant Uint16 := IP_POS + 24;
+   ICMP_POS  : constant Uint16 := IP_POS + 20;
+   DHCP_POS  : constant Uint16 := IP_POS + 20 + 8;
    --  DATA_POS  : constant Natural := UDP_POS + 8;
 
    type Offset_Table is array (Packet_Type) of Uint16;
@@ -36,52 +40,81 @@ package body Net.Buffers is
       IP_PACKET    => 14 + 20,
       ICMP_PACKET  => 14 + 20 + 8,
       UDP_PACKET   => 14 + 20 + 8,
-      DHCP_PACKET  => 14 + 20 + 8 + 236);
+      DHCP_PACKET  => 14 + 20 + 8 + 236,
+      TCP_PACKET   => 14 + 20 + 20);
 
-   function As_Ethernet is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.Ether_Header_Access);
 
-   function As_Arp is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.Arp_Packet_Access);
+   -- gets header offset 
+   function Get_Header_Offset
+     (This : Buffer_Type; Kind : Packet_Type) return Uint16
+   is
+      Result : Uint16 := Offset_Table (Kind);
+      Ip_H   : Net.Headers.IP_Header_Access := null;
+      Tcp_H  : Net.Headers.TCP_Header_Access := null;
+   begin
+      if Kind in IP_PACKET .. TCP_PACKET then
+         Ip_H := IP (This);
+         Result := Result + Net.Headers.Length (Ip_H.all) - 20;
+         if Kind = TCP_PACKET then
+            Tcp_H := Net.Buffers.TCP (This);
+            Result := Result + Net.Headers.Length (Tcp_H.all - 20);
+         end if;
+      end if;
+      return Result;
+   end Get_Header_Offset;
 
-   function As_Ip_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.IP_Header_Access);
+   function As_Ethernet is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.Ether_Header_Access);
 
-   function As_Udp_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.UDP_Header_Access);
+   function As_Arp is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.Arp_Packet_Access);
 
-   function As_Tcp_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.TCP_Header_Access);
+   function As_Ip_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.IP_Header_Access);
 
-   function As_Igmp_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.IGMP_Header_Access);
+   function As_Udp_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.UDP_Header_Access);
 
-   function As_Icmp_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.ICMP_Header_Access);
+   function As_Tcp_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.TCP_Header_Access);
 
-   function As_Dhcp_Header is
-     new Ada.Unchecked_Conversion (Source => System.Address,
-                                   Target => Net.Headers.DHCP_Header_Access);
+   function As_Igmp_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.IGMP_Header_Access);
 
-   protected Manager with Priority => Net.Network_Priority is
+   function As_Icmp_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.ICMP_Header_Access);
+
+   function As_Dhcp_Header is new
+     Ada.Unchecked_Conversion
+       (Source => System.Address,
+        Target => Net.Headers.DHCP_Header_Access);
+
+   protected Manager
+     with Priority => Net.Network_Priority
+   is
       procedure Allocate (Packet : out Packet_Buffer_Access);
 
       procedure Release (Packet : in out Packet_Buffer_Access);
 
-      procedure Add_Region (Addr  : in System.Address;
-                            Count : in Uint32);
+      procedure Add_Region (Addr : in System.Address; Count : in Uint32);
 
       procedure Release (List : in out Buffer_List);
 
-      procedure Allocate (List  : in out Buffer_List;
-                          Count : in Natural);
+      procedure Allocate (List : in out Buffer_List; Count : in Natural);
 
    private
       Free_List : Packet_Buffer_Access;
@@ -102,7 +135,8 @@ package body Net.Buffers is
    procedure Allocate (Buf : out Buffer_Type) is
    begin
       Manager.Allocate (Buf.Packet);
-      Buf.Size   := 0;
+      alloc_counter := alloc_counter + 1;
+      Buf.Size := 0;
    end Allocate;
 
    --  ------------------------------
@@ -113,20 +147,22 @@ package body Net.Buffers is
       if Buf.Packet /= null then
          Manager.Release (Buf.Packet);
       end if;
+      if alloc_counter > 0 then
+         alloc_counter := alloc_counter - 1;
+      end if;
    end Release;
 
    --  ------------------------------
    --  Transfer the ownership of the buffer from <tt>From</tt> to <tt>To</tt>.
    --  If the destination has a buffer, it is first released.
    --  ------------------------------
-   procedure Transfer (To   : in out Buffer_Type;
-                       From : in out Buffer_Type) is
+   procedure Transfer (To : in out Buffer_Type; From : in out Buffer_Type) is
    begin
       if To.Packet /= null then
          Manager.Release (To.Packet);
       end if;
       To.Packet := From.Packet;
-      To.Size   := From.Size;
+      To.Size := From.Size;
       From.Packet := null;
    end Transfer;
 
@@ -135,12 +171,11 @@ package body Net.Buffers is
    --  ring to peek a received packet and install a new buffer on the ring so that there is
    --  always a buffer on the ring.
    --  ------------------------------
-   procedure Switch (To   : in out Buffer_Type;
-                     From : in out Buffer_Type) is
+   procedure Switch (To : in out Buffer_Type; From : in out Buffer_Type) is
       Size   : constant Uint16 := To.Size;
       Packet : constant Packet_Buffer_Access := To.Packet;
    begin
-      To.Size   := From.Size;
+      To.Size := From.Size;
       To.Packet := From.Packet;
       From.Size := Size;
       From.Packet := Packet;
@@ -151,19 +186,20 @@ package body Net.Buffers is
       return Buf.Packet.Data (Buf.Packet.Data'First)'Address;
    end Get_Data_Address;
 
-   function Get_Data_Size (Buf  : in Buffer_Type;
-                           Kind : in Packet_Type) return Uint16 is
+   function Get_Data_Size
+     (Buf : in Buffer_Type) return Uint16 is
    begin
       if Buf.Size = 0 then
-         return Buf.Pos - Offsets (Kind);
+         return Buf.Pos - Get_Header_Offset (Buf, Buf.Kind); -- Offsets (Kind);
+
       else
-         return Buf.Size - Offsets (Kind);
+         return Buf.Size - Get_Header_Offset (Buf, Buf.Kind);-- Offsets (Kind);
       end if;
    end Get_Data_Size;
 
    procedure Set_Data_Size (Buf : in out Buffer_Type; Size : in Uint16) is
    begin
-      Buf.Pos  := Size + Offsets (Buf.Kind);
+      Buf.Pos := Size + Get_Header_Offset (Buf, Buf.Kind);--Offsets (Buf.Kind);
       Buf.Size := 0;
    end Set_Data_Size;
 
@@ -181,18 +217,16 @@ package body Net.Buffers is
    --  ------------------------------
    --  Set the packet type.
    --  ------------------------------
-   procedure Set_Type (Buf  : in out Buffer_Type;
-                       Kind : in Packet_Type) is
+   procedure Set_Type (Buf : in out Buffer_Type; Kind : in Packet_Type) is
    begin
       Buf.Kind := Kind;
-      Buf.Pos  := Offsets (Kind);
+      Buf.Pos := Offsets (Kind);
    end Set_Type;
 
    --  ------------------------------
    --  Add a byte to the buffer data, moving the buffer write position.
    --  ------------------------------
-   procedure Put_Uint8 (Buf   : in out Buffer_Type;
-                        Value : in Net.Uint8) is
+   procedure Put_Uint8 (Buf : in out Buffer_Type; Value : in Net.Uint8) is
    begin
       Buf.Packet.Data (Buf.Pos) := Value;
       Buf.Pos := Buf.Pos + 1;
@@ -202,10 +236,10 @@ package body Net.Buffers is
    --  Add a 16-bit value in network byte order to the buffer data,
    --  moving the buffer write position.
    --  ------------------------------
-   procedure Put_Uint16 (Buf   : in out Buffer_Type;
-                         Value : in Net.Uint16) is
+   procedure Put_Uint16 (Buf : in out Buffer_Type; Value : in Net.Uint16) is
    begin
-      Buf.Packet.Data (Buf.Pos)     := Net.Uint8 (Interfaces.Shift_Right (Value, 8));
+      Buf.Packet.Data (Buf.Pos) :=
+        Net.Uint8 (Interfaces.Shift_Right (Value, 8));
       Buf.Packet.Data (Buf.Pos + 1) := Net.Uint8 (Value and 16#0ff#);
       Buf.Pos := Buf.Pos + 2;
    end Put_Uint16;
@@ -214,12 +248,14 @@ package body Net.Buffers is
    --  Add a 32-bit value in network byte order to the buffer data,
    --  moving the buffer write position.
    --  ------------------------------
-   procedure Put_Uint32 (Buf   : in out Buffer_Type;
-                         Value : in Net.Uint32) is
+   procedure Put_Uint32 (Buf : in out Buffer_Type; Value : in Net.Uint32) is
    begin
-      Buf.Packet.Data (Buf.Pos)     := Net.Uint8 (Interfaces.Shift_Right (Value, 24));
-      Buf.Packet.Data (Buf.Pos + 1) := Net.Uint8 (Interfaces.Shift_Right (Value, 16) and 16#0ff#);
-      Buf.Packet.Data (Buf.Pos + 2) := Net.Uint8 (Interfaces.Shift_Right (Value, 8) and 16#0ff#);
+      Buf.Packet.Data (Buf.Pos) :=
+        Net.Uint8 (Interfaces.Shift_Right (Value, 24));
+      Buf.Packet.Data (Buf.Pos + 1) :=
+        Net.Uint8 (Interfaces.Shift_Right (Value, 16) and 16#0ff#);
+      Buf.Packet.Data (Buf.Pos + 2) :=
+        Net.Uint8 (Interfaces.Shift_Right (Value, 8) and 16#0ff#);
       Buf.Packet.Data (Buf.Pos + 3) := Net.Uint8 (Value and 16#0ff#);
       Buf.Pos := Buf.Pos + 4;
    end Put_Uint32;
@@ -228,10 +264,12 @@ package body Net.Buffers is
    --  Add a string to the buffer data, moving the buffer write position.
    --  When <tt>With_Null</tt> is set, a NUL byte is added after the string.
    --  ------------------------------
-   procedure Put_String (Buf       : in out Buffer_Type;
-                         Value     : in String;
-                         With_Null : in Boolean := False) is
-      Pos  : Uint16 := Buf.Pos;
+   procedure Put_String
+     (Buf       : in out Buffer_Type;
+      Value     : in String;
+      With_Null : in Boolean := False)
+   is
+      Pos : Uint16 := Buf.Pos;
    begin
       for C of Value loop
          Buf.Packet.Data (Pos) := Character'Pos (C);
@@ -247,8 +285,7 @@ package body Net.Buffers is
    --  ------------------------------
    --  Add an IP address to the buffer data, moving the buffer write position.
    --  ------------------------------
-   procedure Put_Ip (Buf   : in out Buffer_Type;
-                     Value : in Ip_Addr) is
+   procedure Put_Ip (Buf : in out Buffer_Type; Value : in Ip_Addr) is
       Pos : Uint16 := Buf.Pos;
    begin
       for C of Value loop
@@ -275,7 +312,8 @@ package body Net.Buffers is
       Pos : constant Net.Uint16 := Buf.Pos;
    begin
       Buf.Pos := Pos + 2;
-      return Interfaces.Shift_Left (Net.Uint16 (Buf.Packet.Data (Pos)), 8)
+      return
+        Interfaces.Shift_Left (Net.Uint16 (Buf.Packet.Data (Pos)), 8)
         or Net.Uint16 (Buf.Packet.Data (Pos + 1));
    end Get_Uint16;
 
@@ -286,7 +324,8 @@ package body Net.Buffers is
       Pos : constant Net.Uint16 := Buf.Pos;
    begin
       Buf.Pos := Pos + 4;
-      return Interfaces.Shift_Left (Net.Uint32 (Buf.Packet.Data (Pos)), 24)
+      return
+        Interfaces.Shift_Left (Net.Uint32 (Buf.Packet.Data (Pos)), 24)
         or Interfaces.Shift_Left (Net.Uint32 (Buf.Packet.Data (Pos + 1)), 16)
         or Interfaces.Shift_Left (Net.Uint32 (Buf.Packet.Data (Pos + 2)), 8)
         or Net.Uint32 (Buf.Packet.Data (Pos + 3));
@@ -310,8 +349,7 @@ package body Net.Buffers is
    --  ------------------------------
    --  Get a string whose length is specified by the target value.
    --  ------------------------------
-   procedure Get_String (Buf  : in out Buffer_Type;
-                         Into : out String) is
+   procedure Get_String (Buf : in out Buffer_Type; Into : out String) is
       Pos : Net.Uint16 := Buf.Pos;
    begin
       for I in Into'Range loop
@@ -324,8 +362,7 @@ package body Net.Buffers is
    --  ------------------------------
    --  Skip a number of bytes in the buffer, moving the buffer position <tt>Size<tt> bytes ahead.
    --  ------------------------------
-   procedure Skip (Buf  : in out Buffer_Type;
-                   Size : in Net.Uint16) is
+   procedure Skip (Buf : in out Buffer_Type; Size : in Net.Uint16) is
    begin
       Buf.Pos := Buf.Pos + Size;
    end Skip;
@@ -341,7 +378,8 @@ package body Net.Buffers is
    --  ------------------------------
    --  Get access to the Ethernet header.
    --  ------------------------------
-   function Ethernet (Buf : in Buffer_Type) return Net.Headers.Ether_Header_Access is
+   function Ethernet
+     (Buf : in Buffer_Type) return Net.Headers.Ether_Header_Access is
    begin
       return As_Ethernet (Buf.Packet.Data (Buf.Packet.Data'First)'Address);
    end Ethernet;
@@ -381,7 +419,8 @@ package body Net.Buffers is
    --  ------------------------------
    --  Get access to the IGMP header.
    --  ------------------------------
-   function IGMP (Buf : in Buffer_Type) return Net.Headers.IGMP_Header_Access is
+   function IGMP (Buf : in Buffer_Type) return Net.Headers.IGMP_Header_Access
+   is
    begin
       return As_Igmp_Header (Buf.Packet.Data (IGMP_POS)'Address);
    end IGMP;
@@ -389,7 +428,8 @@ package body Net.Buffers is
    --  ------------------------------
    --  Get access to the ICMP header.
    --  ------------------------------
-   function ICMP (Buf : in Buffer_Type) return Net.Headers.ICMP_Header_Access is
+   function ICMP (Buf : in Buffer_Type) return Net.Headers.ICMP_Header_Access
+   is
    begin
       return As_Icmp_Header (Buf.Packet.Data (ICMP_POS)'Address);
    end ICMP;
@@ -397,7 +437,8 @@ package body Net.Buffers is
    --  ------------------------------
    --  Get access to the DHCP header.
    --  ------------------------------
-   function DHCP (Buf : in Buffer_Type) return Net.Headers.DHCP_Header_Access is
+   function DHCP (Buf : in Buffer_Type) return Net.Headers.DHCP_Header_Access
+   is
    begin
       return As_Dhcp_Header (Buf.Packet.Data (DHCP_POS)'Address);
    end DHCP;
@@ -413,8 +454,7 @@ package body Net.Buffers is
    --  ------------------------------
    --  Insert the buffer to the list.
    --  ------------------------------
-   procedure Insert (Into : in out Buffer_List;
-                     Buf  : in out Buffer_Type) is
+   procedure Insert (Into : in out Buffer_List; Buf : in out Buffer_Type) is
    begin
       if Into.Tail = null then
          Into.Tail := Buf.Packet;
@@ -422,8 +462,8 @@ package body Net.Buffers is
       else
          Buf.Packet.Next := Into.Head;
       end if;
-      Into.Head       := Buf.Packet;
-      Buf.Packet      := null;
+      Into.Head := Buf.Packet;
+      Buf.Packet := null;
    end Insert;
 
    --  ------------------------------
@@ -438,8 +478,7 @@ package body Net.Buffers is
    --  Allocate <tt>Count</tt> buffers and add them to the list.
    --  There is no guarantee that the required number of buffers will be allocated.
    --  ------------------------------
-   procedure Allocate (List  : in out Buffer_List;
-                       Count : in Natural) is
+   procedure Allocate (List : in out Buffer_List; Count : in Natural) is
    begin
       Manager.Allocate (List, Count);
    end Allocate;
@@ -447,12 +486,11 @@ package body Net.Buffers is
    --  ------------------------------
    --  Peek a buffer from the list.
    --  ------------------------------
-   procedure Peek (From : in out Buffer_List;
-                   Buf  : in out Buffer_Type) is
+   procedure Peek (From : in out Buffer_List; Buf : in out Buffer_Type) is
    begin
       Buf.Packet := From.Head;
-      Buf.Size   := Buf.Packet.Size;
-      From.Head  := From.Head.Next;
+      Buf.Size := Buf.Packet.Size;
+      From.Head := From.Head.Next;
       if From.Head = null then
          From.Tail := null;
       end if;
@@ -463,8 +501,7 @@ package body Net.Buffers is
    --  by <tt>To</tt>.  After the transfer, the <tt>From</tt> list is empty.
    --  The complexity is in O(1).
    --  ------------------------------
-   procedure Transfer (To   : in out Buffer_List;
-                       From : in out Buffer_List) is
+   procedure Transfer (To : in out Buffer_List; From : in out Buffer_List) is
    begin
       if To.Tail /= null then
          To.Tail.Next := From.Head;
@@ -480,8 +517,7 @@ package body Net.Buffers is
    --  ------------------------------
    --  Add a memory region to the buffer pool.
    --  ------------------------------
-   procedure Add_Region (Addr : in System.Address;
-                         Size : in Uint32) is
+   procedure Add_Region (Addr : in System.Address; Size : in Uint32) is
       Count : constant Uint32 := Size / NET_ALLOC_SIZE;
    begin
       Manager.Add_Region (Addr, Count);
@@ -491,15 +527,14 @@ package body Net.Buffers is
 
       procedure Allocate (Packet : out Packet_Buffer_Access) is
       begin
-         Packet    := Free_List;
+         Packet := Free_List;
          if Packet /= null then
             Free_List := Packet.Next;
             Packet.Size := 0;
          end if;
       end Allocate;
 
-      procedure Allocate (List  : in out Buffer_List;
-                          Count : in Natural) is
+      procedure Allocate (List : in out Buffer_List; Count : in Natural) is
          Packet : Packet_Buffer_Access;
       begin
          for I in 1 .. Count loop
@@ -518,26 +553,26 @@ package body Net.Buffers is
       procedure Release (Packet : in out Packet_Buffer_Access) is
       begin
          Packet.Next := Free_List;
-         Free_List   := Packet;
-         Packet      := null;
+         Free_List := Packet;
+         Packet := null;
       end Release;
 
       procedure Release (List : in out Buffer_List) is
       begin
          List.Tail.Next := Free_List;
-         Free_List   := List.Head;
-         List.Head   := null;
-         List.Tail   := null;
+         Free_List := List.Head;
+         List.Head := null;
+         List.Tail := null;
       end Release;
 
-      procedure Add_Region (Addr  : in System.Address;
-                            Count : in Uint32) is
+      procedure Add_Region (Addr : in System.Address; Count : in Uint32) is
 
          type Packet_Array is array (1 .. Count) of aliased Packet_Buffer;
          type Packet_Array_Access is access all Packet_Array;
-         function As_Packet_List is
-           new Ada.Unchecked_Conversion (Source => System.Address,
-                                         Target => Packet_Array_Access);
+         function As_Packet_List is new
+           Ada.Unchecked_Conversion
+             (Source => System.Address,
+              Target => Packet_Array_Access);
 
          Packets : Packet_Array_Access := As_Packet_List (Addr);
       begin
@@ -545,6 +580,7 @@ package body Net.Buffers is
             Packets (I).Next := Free_List;
             Free_List := Packets (I)'Unchecked_Access;
          end loop;
+         all_buffers := all_buffers + Natural (count);
       end Add_Region;
 
    end Manager;
