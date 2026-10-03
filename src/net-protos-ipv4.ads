@@ -18,12 +18,39 @@
 with Net.Headers;
 with Net.Interfaces;
 with Net.Buffers;
+with Ada.Unchecked_Conversion;
+with System; use System;
+
 package Net.Protos.IPv4 is
 
    P_ICMP : constant Net.Uint8 := 1;
    P_IGMP : constant Net.Uint8 := 2;
    P_TCP  : constant Net.Uint8 := 6;
    P_UDP  : constant Net.Uint8 := 17;
+
+   Send_Dont_Fragment : Boolean := True;
+
+   subtype Fragment_Offset_type is Uint16 range 0 .. (2**13-1);
+
+   type fragmentation_type is record
+     reserved : Boolean := False;
+     Dont_Fragment : Boolean := Send_Dont_Fragment;
+     More_Fragments : Boolean := False;
+     Fragment_Offset : Fragment_Offset_type := 0;
+   end record with Object_Size => Uint16'Size;
+   for fragmentation_type'Bit_Order use High_Order_First;
+   for fragmentation_type use record
+     reserved at 0 range Uint16'Size - 1 .. Uint16'Size - 1;
+     Dont_Fragment at 0 range Uint16'Size - 2 .. Uint16'Size - 2;
+     More_Fragments at 0 range Uint16'Size - 3 .. Uint16'Size - 3;
+     Fragment_Offset at 0 range 0 .. Uint16'Size - 4 ;
+     end record;
+
+  function To_Uint16 is new Ada.Unchecked_Conversion(fragmentation_type, Uint16);
+  function To_fragmentation_type is new Ada.Unchecked_Conversion(Uint16, fragmentation_type); 
+     
+     
+   
 
    --  Make an IP packet identifier.
    procedure Make_Ident (Ip : in Net.Headers.IP_Header_Access);
@@ -34,6 +61,11 @@ package Net.Protos.IPv4 is
                           Dst    : in Ip_Addr;
                           Proto  : in Uint8;
                           Length : in Uint16);
+
+   function Get_Fragmentation (Ip : in Net.Headers.IP_Header_Access) return fragmentation_type is
+                                                                              (To_fragmentation_type(Ip.Ip_Off));
+
+   procedure Set_Fragmentation (Ip : in Net.Headers.IP_Header_Access; Fragmentation : in fragmentation_type);
 
    --  Send the raw IPv4 packet to the interface.  The destination Ethernet address is
    --  resolved from the ARP table and the packet Ethernet header updated.  The packet

@@ -83,6 +83,7 @@ package body Net.Protos.IPv4 is
       Ip.Ip_Ihl := 16#45#;
       Ip.Ip_Tos := 0;
       Ip.Ip_Off := Net.Headers.To_Network (16#4000#);
+      --To_Uint16 (fragmentation_type'(Dont_Fragment => Send_Dont_Fragment, others => <>));     --
       Ip.Ip_Ttl := 64;
       Ip.Ip_Sum := 0;
       Ip.Ip_Src := Src;
@@ -102,7 +103,8 @@ package body Net.Protos.IPv4 is
       Ip.Ip_Ihl := 4;
       Ip.Ip_Tos := 0;
       Ip.Ip_Id  := 2;
-      Ip.Ip_Off := 0;
+      Ip.Ip_Off := Net.Headers.To_Network (16#4000#);
+            --To_Uint16 (fragmentation_type'(Dont_Fragment => Send_Dont_Fragment, others => <>));     --;
       Ip.Ip_Ttl := 255;
       Ip.Ip_Sum := 0;
       Ip.Ip_Src := Ifnet.Ip;
@@ -114,4 +116,10 @@ package body Net.Protos.IPv4 is
       Send_Raw (Ifnet, Target_Ip, Packet, Status);
    end Send;
 
+      
+   procedure Set_Fragmentation (Ip : in Net.Headers.IP_Header_Access; Fragmentation : in fragmentation_type) is 
+   begin
+         Ip.Ip_Off := To_Uint16 (Fragmentation);
+   end Set_Fragmentation;
+   
 end Net.Protos.IPv4;

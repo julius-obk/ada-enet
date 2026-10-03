@@ -115,15 +115,25 @@ package Net.Buffers is
       DHCP_PACKET,
       TCP_PACKET);
 
+<<<<<<< HEAD
    --   type Data_Type is array (Net.Uint16 range 0 .. 1500 + 31) of aliased Uint8 with -- 0 .. 2048) of aliased Uint8 with
    --   Alignment => 32;
 
    type Data_Array_Type is array (Net.Uint16 range <>) of aliased Uint8
    with
      -- 0 .. 2048) of aliased Uint8 with
+=======
+--   type Data_Type is array (Net.Uint16 range 0 .. 1500 + 31) of aliased Uint8 with -- 0 .. 2048) of aliased Uint8 with 
+  --   Alignment => 32;
+
+     type Data_Type is array (Net.Uint16 range 0 .. 2047) of aliased Uint8 with -- 0 .. 2048) of aliased Uint8 with 
+>>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
      Alignment => 32;
    subtype Data_Type is Data_Array_Type (Net.Uint16 range 0 .. 2047);
 
+
+
+     
    type Buffer_Type is tagged limited private;
 
    --  Returns true if the buffer is null (allocation failed).
@@ -304,7 +314,11 @@ private
       Size   : Uint16 := 0;
       Pos    : Uint16 := 0;
       Packet : Packet_Buffer_Access;
+<<<<<<< HEAD
       --
+=======
+      -- 
+>>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
       --big : Boolean := False;
    end record;
 
@@ -317,5 +331,9 @@ private
    NET_BUF_SIZE   : constant Uint32 := Data_Type'Size / 8;
 
    alloc_counter : Natural := 0;
+<<<<<<< HEAD
    all_buffers   : Natural := 0;
+=======
+   all_buffers : Natural := 0;
+>>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
 end Net.Buffers;

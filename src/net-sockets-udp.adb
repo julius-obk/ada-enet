@@ -107,7 +107,11 @@ package body Net.Sockets.Udp is
          Soc := Soc.Next;
       end loop;
       Ifnet.Rx_Stats.Ignored := Ifnet.Rx_Stats.Ignored + 1;
+<<<<<<< HEAD
       Packet.Release; -- release packet as it has been ignored
+=======
+      Packet.Release; --neu
+>>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
    end Input;
 
    --  ------------------------------

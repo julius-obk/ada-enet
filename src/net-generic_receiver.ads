@@ -36,6 +36,7 @@ package Net.Generic_Receiver is
 
    --  The task that waits for packets.
    task Controller with
+     CPU => 1,
      Storage_Size => Storage_Size,
      Priority => Priority;
 
