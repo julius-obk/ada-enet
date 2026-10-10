@@ -31,6 +31,7 @@ package body Net.Protos.Dispatchers is
    Icmp_Receive    : Receive_Handler := Net.Protos.Icmp.Receive'Access;
    Udp_Receive     : Receive_Handler := Net.Sockets.Udp.Input'Access;
    Other_Receive   : Receive_Handler := Default_Receive'Access;
+   Tcp_Receive : Receive_Handler :=  Default_Receive'Access;
 
    --  ------------------------------
    --  Set a protocol handler to deal with a packet of the given protocol when it is received.
@@ -52,6 +53,11 @@ package body Net.Protos.Dispatchers is
          when Net.Protos.IPv4.P_UDP =>
             Previous    := Udp_Receive;
             Udp_Receive := Handler;
+
+            when Net.Protos.IPv4.P_TCP =>
+            Previous    := Tcp_Receive;
+            Tcp_Receive := Handler;
+      
 
          when others =>
             Previous      := Other_Receive;
@@ -87,7 +93,10 @@ package body Net.Protos.Dispatchers is
             Igmp_Receive (Ifnet, Packet);
 
          when Net.Protos.IPv4.P_UDP =>
-            Udp_Receive (Ifnet, Packet);
+               Udp_Receive (Ifnet, Packet);
+
+            when Net.Protos.IPv4.P_TCP =>
+                  Tcp_Receive(Ifnet, Packet);
 
          when others =>
             Other_Receive (Ifnet, Packet);
