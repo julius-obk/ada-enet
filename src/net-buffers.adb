@@ -134,15 +134,12 @@ package body Net.Buffers is
    --  ------------------------------
    procedure Allocate (Buf : out Buffer_Type) is
    begin
-<<<<<<< HEAD
       Manager.Allocate (Buf.Packet);
       alloc_counter := alloc_counter + 1;
       Buf.Size := 0;
-=======
      Manager.Allocate (Buf.Packet);
      alloc_counter := alloc_counter + 1;
       Buf.Size   := 0;
->>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
    end Allocate;
 
    --  ------------------------------
@@ -154,11 +151,7 @@ package body Net.Buffers is
          Manager.Release (Buf.Packet);
       end if;
       if alloc_counter > 0 then
-<<<<<<< HEAD
          alloc_counter := alloc_counter - 1;
-=======
-        alloc_counter := alloc_counter - 1;
->>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
       end if;
    end Release;
 
@@ -590,11 +583,7 @@ package body Net.Buffers is
             Packets (I).Next := Free_List;
             Free_List := Packets (I)'Unchecked_Access;
          end loop;
-<<<<<<< HEAD
          all_buffers := all_buffers + Natural (count);
-=======
-         all_buffers := all_buffers + Natural(count);
->>>>>>> 32f95e45759d7c23d6e94b9f65de5704e6424552
       end Add_Region;
 
    end Manager;
